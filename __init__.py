@@ -10,13 +10,14 @@ username = "lzy00789@hotmail.com"
 passwd = "Fzyl890705"
 
 #proxy
-proxy = urllib2.ProxyHandler({'http':'http://zli:P@ssw0rd@172.29.5.10:8080'})
-auth = urllib2.HTTPBasicAuthHandler()
+#proxy = urllib2.ProxyHandler({'http':'http://zli:P@ssw0rd@172.29.5.10:8080'})
+#auth = urllib2.HTTPBasicAuthHandler()
 #cookie
 cookiejar = cookielib.CookieJar()
 cookie_support = urllib2.HTTPCookieProcessor(cookiejar)
 #opener
-opener = urllib2.build_opener(proxy, auth, cookie_support, urllib2.HTTPHandler)
+#opener = urllib2.build_opener(proxy, auth, cookie_support, urllib2.HTTPHandler)
+opener = urllib2.build_opener(cookie_support, urllib2.HTTPHandler)
 urllib2.install_opener(opener)
                    
 loginer = WeiboLogin(opener, username, passwd)
@@ -29,18 +30,24 @@ data  = loginer.get_html(starturl)
 
 data_clean = data.replace("\\\"","\"").replace("\\/","/")
 
+#print data_clean
+
 pattern_html = re.compile(r'followTab/index.*"html":"(.*?)\\r\\n"}')
 
-match1 = pattern_html.search(data)  
-#TODO : condition for no match #print match1.group(0)
+match1 = pattern_html.search(data_clean)  
+#TODO : condition for no match
+#print match1.group(1)
 
-soup = BeautifulSoup(match1.group(0))
+soup = BeautifulSoup(match1.group(1))
+#print(soup.prettify())
 
-taglist = soup.find_all()
+taglist = soup.find_all("img")
 
 for li in taglist:
-    print "aa"
-
+    #soup_followunit = BeautifulSoup(li)
+    #img_tag = soup_followunit.find_all("img")
+    #print type(li)
+    print li['alt']," ",li['src']," ",li['usercard'] 
 print "fin" 
 
 '''
