@@ -9,6 +9,7 @@ import base64
 import binascii
 import re
 import json
+import time
 
 from errors import DependencyNotInstalledError,\
                              LoginFailure
@@ -35,6 +36,7 @@ class WeiboLogin(object):
                 isopen = False
             except:
                 isopen = True
+                print "Can't getUrl"
                 time.sleep(0.2)          
         return result    
         
