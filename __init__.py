@@ -6,8 +6,8 @@ import cookielib
 from bs4 import BeautifulSoup
 from login import WeiboLogin
 
-username = "lzy00789@hotmail.com"
-passwd = "Fzyl890705"
+username = "username"
+passwd = "psw"
 
 #proxy
 proxy = urllib2.ProxyHandler({'http':'http://zli:Passw0rd@172.29.5.10:8080'})
@@ -24,7 +24,7 @@ loginer = WeiboLogin(opener, username, passwd)
 
 print loginer.login()
 
-startid = "1446847653"
+startid = "1676582524"
 
 
 #BlackBox begins
@@ -56,7 +56,7 @@ while not nextfollowetPage is None:
     nextdata_clean = nextdata.replace("\\\"","\"").replace("\\/","/")
     #ZLI 
     #prerequis: next page will always contain a "pl.content.followTab.index"
-    #TODO: here maybe
+    #TODO: maybe need a condition
     nextfollowerlist = pattern_html.search(nextdata_clean).group(1)
     #print nextfollowerlist
     followerlist = followerlist + nextfollowerlist
