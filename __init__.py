@@ -6,73 +6,101 @@ import cookielib
 from bs4 import BeautifulSoup
 from login import WeiboLogin
 
+#global variables
 username = "username"
-passwd = "psw"
+passwd = "psd"
+expandLevel = 1
+
+dicID_Name = dict()
+dicID_Count= dict()
+dicID_Img  = dict()
+
 
 #proxy
-proxy = urllib2.ProxyHandler({'http':'http://zli:Passw0rd@172.29.5.10:8080'})
-auth = urllib2.HTTPBasicAuthHandler()
+#proxy = urllib2.ProxyHandler({'http':'http://zli:Passw0rd@172.29.5.10:8080'})
+#auth = urllib2.HTTPBasicAuthHandler()
 #cookie
 cookiejar = cookielib.CookieJar()
 cookie_support = urllib2.HTTPCookieProcessor(cookiejar)
 #opener
-opener = urllib2.build_opener(proxy, auth, cookie_support, urllib2.HTTPHandler)
-#opener = urllib2.build_opener(cookie_support, urllib2.HTTPHandler)
+#opener = urllib2.build_opener(proxy, auth, cookie_support, urllib2.HTTPHandler)
+opener = urllib2.build_opener(cookie_support, urllib2.HTTPHandler)
 urllib2.install_opener(opener)
                    
 loginer = WeiboLogin(opener, username, passwd)
 
 print loginer.login()
 
-startid = "1676582524"
+startid = "1898526801"
 
 
 #BlackBox begins
-starturl = 'http://www.weibo.com/%s/follow?from=page_100505&wvr=6&mod=headfollow'%startid 
+def openlink(uid, actuallevel):
+    print uid
+    starturl = 'http://www.weibo.com/%s/follow?from=page_100505&wvr=6&mod=headfollow'%uid
 
-data  = loginer.get_html(starturl)
+    data  = loginer.get_html(starturl)
 
-data_clean = data.replace("\\\"","\"").replace("\\/","/")
+    data_clean = data.replace("\\\"","\"").replace("\\/","/")
 
-pattern_html = re.compile(r'followTab/index.*"html":"(.*?)\\r\\n"}')
-pattern_nextpagelink = re.compile(r'class="page next S_txt1 S_line1" href="(.*?)">')
+    pattern_html = re.compile(r'followTab/index.*"html":"(.*?)\\r\\n"}')
+    pattern_nextpagelink = re.compile(r'class="page next S_txt1 S_line1" href="(.*?)">')
 
-match1 = pattern_html.search(data_clean)
-#TODO : condition for no match
-#print match1.group(1)
+    match1 = pattern_html.search(data_clean)
+    #TODO : condition for no match
+    #print match1.group(1)
 
-#if match1 is None:
+    if match1 is None:
+        return
+    followerlist = match1.group(1)
 
-followerlist = match1.group(1)
+    nextfollowetPage = pattern_nextpagelink.search(data_clean)
 
-nextfollowetPage = pattern_nextpagelink.search(data_clean)
+    #ZLI: Get a div with all followers
+    while not nextfollowetPage is None:
+        nextlink = nextfollowetPage.group(1)
+        nextlink = "http://www.weibo.com" + nextlink
+        #print nextlink
+        nextdata = loginer.get_html(nextlink)
+        nextdata_clean = nextdata.replace("\\\"","\"").replace("\\/","/")
+        #ZLI
+        #prerequis: next page will always contain a "pl.content.followTab.index"
+        if pattern_html.search(nextdata_clean) is None:
+            return
+        nextfollowerlist = pattern_html.search(nextdata_clean).group(1)
+        #print nextfollowerlist
+        followerlist = followerlist + nextfollowerlist
+        #print followerlist
+        nextfollowetPage = pattern_nextpagelink.search(nextdata_clean)
 
-#ZLI: Get a div with all followers
-while not nextfollowetPage is None:
-    nextlink = nextfollowetPage.group(1)
-    nextlink = "http://www.weibo.com" + nextlink
-    print nextlink
-    nextdata = loginer.get_html(nextlink)
-    nextdata_clean = nextdata.replace("\\\"","\"").replace("\\/","/")
-    #ZLI 
-    #prerequis: next page will always contain a "pl.content.followTab.index"
-    #TODO: maybe need a condition
-    nextfollowerlist = pattern_html.search(nextdata_clean).group(1)
-    #print nextfollowerlist
-    followerlist = followerlist + nextfollowerlist
-    #print followerlist
-    nextfollowetPage = pattern_nextpagelink.search(nextdata_clean)
+    soup = BeautifulSoup(followerlist)
+    flist = soup.find_all("img")
+    tem = 0
+    for li in flist:
+        tem += 1
+        try:
+            userid = re.search(r"\d+",li['usercard']).group(0)
+            #print li['alt']," ",li['src']," ",userid
+            if userid not in dicID_Name:
+                dicID_Name[userid] = li['alt']
+            if userid not in dicID_Img:
+                dicID_Img[userid] = li['src']
+            if userid not in dicID_Count:
+                dicID_Count[userid] = 0
+            else:dicID_Count[userid] = dicID_Count[userid] + 1
 
-soup = BeautifulSoup(followerlist)
-flist = soup.find_all("img")
-tem = 0
-for li in flist:
-    tem += 1
-    try:
-        print li['alt']," ",li['src']," ",li['usercard']
-    except KeyError:
-        pass
-print "fin:%s"%tem
+            if actuallevel < expandLevel:
+                print "level:", actuallevel
+                openlink(userid,actuallevel+1)
+        except KeyError:
+            pass
+    print "fin:%s"%tem
+
+openlink(startid,0)
+
+#print dicID_Name
+#print dicID_Img
+print dicID_Count
 
     
 '''
