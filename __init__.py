@@ -2,18 +2,108 @@ import re
 import urllib
 import urllib2
 import cookielib
+import threading
+import time
 
 from bs4 import BeautifulSoup
 from login import WeiboLogin
 
 #global variables
 username = "username"
-passwd = "psd"
+passwd = "psw"
 expandLevel = 1
 
 dicID_Name = dict()
 dicID_Count= dict()
 dicID_Img  = dict()
+tlock = threading.Lock()
+temp_count = 0
+Total_threadSize = 500
+
+# OpenLink thread
+class OpenLinkThread(threading.Thread):
+    def __init__(self, uid,actuallevel):
+        self.uid          = uid
+        self.actuallevel  = actuallevel
+        threading.Thread.__init__(self)
+    def run(self):
+        global tlock
+        global temp_count
+        global dicID_Name
+        global dicID_Count
+        global dicID_Img
+        global Total_threadSize
+
+        print "\n New thread begins:"+self.uid
+        starturl = 'http://www.weibo.com/%s/follow?from=page_100505&wvr=6&mod=headfollow'%self.uid
+        data  = loginer.get_html(starturl)
+        data_clean = data.replace("\\\"","\"").replace("\\/","/")
+
+        pattern_html = re.compile(r'followTab/index.*"html":"(.*?)\\r\\n"}')
+        pattern_nextpagelink = re.compile(r'class="page next S_txt1 S_line1" href="(.*?)">')
+
+        match1 = pattern_html.search(data_clean)
+        #no follwers: quit
+        if match1 is None:
+            return
+        followerlist = match1.group(1)
+
+        nextfollowetPage = pattern_nextpagelink.search(data_clean)
+
+        #ZLI: Get a div with all followers
+        while not nextfollowetPage is None:
+            nextlink = nextfollowetPage.group(1)
+            nextlink = "http://www.weibo.com" + nextlink
+            #print nextlink
+            nextdata = loginer.get_html(nextlink)
+            nextdata_clean = nextdata.replace("\\\"","\"").replace("\\/","/")
+            #ZLI
+            #prerequis: next page will always contain a "pl.content.followTab.index"
+            if pattern_html.search(nextdata_clean) is None:
+                return
+            nextfollowerlist = pattern_html.search(nextdata_clean).group(1)
+            #print nextfollowerlist
+            followerlist = followerlist + nextfollowerlist
+            #print followerlist
+            nextfollowetPage = pattern_nextpagelink.search(nextdata_clean)
+
+        soup = BeautifulSoup(followerlist)
+        flist = soup.find_all("img")
+
+        tlock.acquire()                          # Lock; or wait if other thread is holding the lock
+        print "\nThread %s Locked"%self.uid
+        for li in flist:
+            temp_count += 1
+            try:
+                #print "Perf01:%f"%time.time()
+                userid = re.search(r"\d+",li['usercard']).group(0)
+                #print "Perf02:%f"%time.time()
+                #print "\nThread:"+ self.uid + "->" + userid
+                #print li['alt']," ",li['src']," ",userid
+                if userid not in dicID_Name:
+                    dicID_Name[userid] = li['alt']
+                if userid not in dicID_Img:
+                    dicID_Img[userid] = li['src']
+                if userid not in dicID_Count:
+                    dicID_Count[userid] = 1
+                else:
+                    dicID_Count[userid] = dicID_Count[userid] + 1
+                #print "Perf03:%f"%time.time()
+                if self.actuallevel < expandLevel:
+                    #print "level:%d"%self.actuallevel
+                    while True:
+                        if threading.activeCount()<Total_threadSize:
+                            break
+                        time.sleep(0.2)
+
+                    new_thread = OpenLinkThread(userid,self.actuallevel + 1)
+                    new_thread.start()
+            except KeyError:
+                pass
+        tlock.release()
+        print "\nThread %s Released"%self.uid
+
+        print "\nThread ", self.uid , "is Over"
 
 
 #proxy
@@ -33,153 +123,32 @@ print loginer.login()
 
 startid = "1898526801"
 
+print "\nBefore:%d"%threading.activeCount()
+new_thread = OpenLinkThread(startid,0)
+new_thread.start()
+print "\nAfter:%d"%threading.activeCount()
 
-#BlackBox begins
-def openlink(uid, actuallevel):
-    print uid
-    starturl = 'http://www.weibo.com/%s/follow?from=page_100505&wvr=6&mod=headfollow'%uid
+while True:
+    time.sleep(1)
+    print threading.activeCount()
+    if threading.activeCount() == 1:
+        break
 
-    data  = loginer.get_html(starturl)
+print "\nAll:%d"%temp_count
 
-    data_clean = data.replace("\\\"","\"").replace("\\/","/")
+#print dicID_Count['1898526801']
+print "TEST1"
+print sorted(dicID_Count.values())[-1:-11:-1]
+print "\nTest2"
+#test = []
+result = sorted(dicID_Count.items(), key=lambda d: d[1])
 
-    pattern_html = re.compile(r'followTab/index.*"html":"(.*?)\\r\\n"}')
-    pattern_nextpagelink = re.compile(r'class="page next S_txt1 S_line1" href="(.*?)">')
+print result[-1:-11:-1]
 
-    match1 = pattern_html.search(data_clean)
-    #TODO : condition for no match
-    #print match1.group(1)
-
-    if match1 is None:
-        return
-    followerlist = match1.group(1)
-
-    nextfollowetPage = pattern_nextpagelink.search(data_clean)
-
-    #ZLI: Get a div with all followers
-    while not nextfollowetPage is None:
-        nextlink = nextfollowetPage.group(1)
-        nextlink = "http://www.weibo.com" + nextlink
-        #print nextlink
-        nextdata = loginer.get_html(nextlink)
-        nextdata_clean = nextdata.replace("\\\"","\"").replace("\\/","/")
-        #ZLI
-        #prerequis: next page will always contain a "pl.content.followTab.index"
-        if pattern_html.search(nextdata_clean) is None:
-            return
-        nextfollowerlist = pattern_html.search(nextdata_clean).group(1)
-        #print nextfollowerlist
-        followerlist = followerlist + nextfollowerlist
-        #print followerlist
-        nextfollowetPage = pattern_nextpagelink.search(nextdata_clean)
-
-    soup = BeautifulSoup(followerlist)
-    flist = soup.find_all("img")
-    tem = 0
-    for li in flist:
-        tem += 1
-        try:
-            userid = re.search(r"\d+",li['usercard']).group(0)
-            #print li['alt']," ",li['src']," ",userid
-            if userid not in dicID_Name:
-                dicID_Name[userid] = li['alt']
-            if userid not in dicID_Img:
-                dicID_Img[userid] = li['src']
-            if userid not in dicID_Count:
-                dicID_Count[userid] = 0
-            else:dicID_Count[userid] = dicID_Count[userid] + 1
-
-            if actuallevel < expandLevel:
-                print "level:", actuallevel
-                openlink(userid,actuallevel+1)
-        except KeyError:
-            pass
-    print "fin:%s"%tem
-
-openlink(startid,0)
-
+for k in range(len(result)-1,len(result)-11,-1):
+    print result[k][0]
 #print dicID_Name
 #print dicID_Img
-print dicID_Count
-
-    
-'''
-testurl = "http://www.weibo.com/p/1035051282005885/follow?page=6#Pl_Official_HisRelation__60"
-
-test  = loginer.get_html(testurl)
-test_clean = test.replace("\\\"","\"").replace("\\/","/")
-
-match1 = pattern_html.search(test_clean) 
-
-soup = BeautifulSoup(match1.group(1))
-#print(soup.prettify())
-'''
-
-'''
-taglist = soup.find_all("img")
-
-for li in taglist:
-    #soup_followunit = BeautifulSoup(li)
-    #img_tag = soup_followunit.find_all("img")
-    #print type(li)
-    print li['alt']," ",li['src']," ",li['usercard'] 
-print "fin" 
-'''
-
-#next_page = soup.find_all("a","page next S_txt1 S_line1")
+#print dicID_Count
 
 
-'''
-pattern_html = re.compile(r'(  .*?)"})') 
-
-data_focus = re.search('(?<=abc)def', data)
-print data_focus.group(0)
-
-
-data_clean = data.replace("\\\"","\"").replace("\\/","/")
-#print data_clean
-
-soup = BeautifulSoup(data_clean)
-#print(soup.prettify())
-
-taglist = soup.find_all('li')
-
-for li in taglist:
-    print "aa"
-
-print "fin" 
-'''
-
-'''
-conn = urllib2.urlopen('http://weibo.com/1610062637/follow?from=page_100505&wvr=6&mod=headfollow')
-s1 = conn.read()
-
-print s1
-'''
-
-'''
-
-def login_hook(opener, **kw):
-    username = "lzy00789@hotmail.com"
-    passwd = "Fzyl890705"
-    
-    loginer = WeiboLogin(opener, username, passwd)
-    return loginer.login()
-
-url_patterns = UrlPatterns(
-    Url(r'http://weibo.com/aj/mblog/mbloglist.*', 'micro_blog', MicroBlogParser),
-    Url(r'http://weibo.com/aj/.+/big.*', 'forward_comment_like', ForwardCommentLikeParser),
-    Url(r'http://weibo.com/\d+/info', 'user_info', UserInfoParser),
-    Url(r'http://weibo.com/\d+/follow.*', 'follows', UserFriendParser),
-    Url(r'http://weibo.com/\d+/fans.*', 'fans', UserFriendParser)
-)
-
-def get_job_desc():
-    return JobDescription('sina weibo crawler', url_patterns, MechanizeOpener, user_config, 
-                          starts, unit_cls=WeiboUserBundle, login_hook=login_hook)
-    
-if __name__ == "__main__":
-    from cola.context import Context
-    ctx = Context(local_mode=True)
-    ctx.run_job(os.path.dirname(os.path.abspath(__file__)))
-'''
