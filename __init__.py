@@ -9,8 +9,8 @@ from bs4 import BeautifulSoup
 from login import WeiboLogin
 
 #global variables
-username = "username"
-passwd = "psw"
+username = "user"
+passwd = "pwd"
 expandLevel = 1
 
 dicID_Name = dict()
@@ -18,7 +18,7 @@ dicID_Count= dict()
 dicID_Img  = dict()
 tlock = threading.Lock()
 temp_count = 0
-Total_threadSize = 500
+Total_threadSize = 300
 
 # OpenLink thread
 class OpenLinkThread(threading.Thread):
@@ -34,7 +34,7 @@ class OpenLinkThread(threading.Thread):
         global dicID_Img
         global Total_threadSize
 
-        print "\n New thread begins:"+self.uid
+        print "\nNew thread begins:"+self.uid
         starturl = 'http://www.weibo.com/%s/follow?from=page_100505&wvr=6&mod=headfollow'%self.uid
         data  = loginer.get_html(starturl)
         data_clean = data.replace("\\\"","\"").replace("\\/","/")
@@ -45,6 +45,7 @@ class OpenLinkThread(threading.Thread):
         match1 = pattern_html.search(data_clean)
         #no follwers: quit
         if match1 is None:
+            print "No followers"
             return
         followerlist = match1.group(1)
 
@@ -105,28 +106,34 @@ class OpenLinkThread(threading.Thread):
 
         print "\nThread ", self.uid , "is Over"
 
-
+start = time.clock()
 #proxy
-#proxy = urllib2.ProxyHandler({'http':'http://zli:Passw0rd@172.29.5.10:8080'})
-#auth = urllib2.HTTPBasicAuthHandler()
+proxy = urllib2.ProxyHandler({'http':'http://zli:Passw0rd@172.29.5.10:8080'})
+auth = urllib2.HTTPBasicAuthHandler()
 #cookie
 cookiejar = cookielib.CookieJar()
 cookie_support = urllib2.HTTPCookieProcessor(cookiejar)
 #opener
-#opener = urllib2.build_opener(proxy, auth, cookie_support, urllib2.HTTPHandler)
-opener = urllib2.build_opener(cookie_support, urllib2.HTTPHandler)
+opener = urllib2.build_opener(proxy, auth, cookie_support, urllib2.HTTPHandler)
+#opener = urllib2.build_opener(cookie_support, urllib2.HTTPHandler)
 urllib2.install_opener(opener)
                    
 loginer = WeiboLogin(opener, username, passwd)
 
 print loginer.login()
 
-startid = "1898526801"
+#startid = "2859682070" #YannJiang
+#startid = "3790747401" #Meizi
+#startid = "1898526801" #PangZi
+startid = "1224138841" #Jin
+
 
 print "\nBefore:%d"%threading.activeCount()
 new_thread = OpenLinkThread(startid,0)
 new_thread.start()
 print "\nAfter:%d"%threading.activeCount()
+
+new_thread.join()
 
 while True:
     time.sleep(1)
@@ -137,18 +144,24 @@ while True:
 print "\nAll:%d"%temp_count
 
 #print dicID_Count['1898526801']
-print "TEST1"
-print sorted(dicID_Count.values())[-1:-11:-1]
-print "\nTest2"
+#print "TEST1"
+#print sorted(dicID_Count.values())[-1:-11:-1]
+#print "\nTest2"
 #test = []
 result = sorted(dicID_Count.items(), key=lambda d: d[1])
 
-print result[-1:-11:-1]
-
+#print result[-1:-11:-1]
+print "####################### TOP 10 ##########################"
 for k in range(len(result)-1,len(result)-11,-1):
-    print result[k][0]
+    strID = result[k][0]
+    print strID + ":%d"%result[k][1]
+    #print dicID_Name[strID]
 #print dicID_Name
 #print dicID_Img
 #print dicID_Count
 
 
+done = time.clock()
+
+print "Time cost:"
+print done - start
