@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-
+#Verison basic
 class DependencyNotInstalledError(Exception):
     def __init__(self, dep):
         self.dep = dep

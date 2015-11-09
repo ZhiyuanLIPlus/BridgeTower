@@ -108,7 +108,7 @@ class OpenLinkThread(threading.Thread):
 
 start = time.clock()
 #proxy
-proxy = urllib2.ProxyHandler({'123456':'123456'})
+proxy = urllib2.ProxyHandler({'':''})
 auth = urllib2.HTTPBasicAuthHandler()
 #cookie
 cookiejar = cookielib.CookieJar()
